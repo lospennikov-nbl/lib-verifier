@@ -20,8 +20,10 @@ program
   }
 })
 .option('-l, --local', 'Do not pull before every run', () => verifier.local = true)
+.option('--exclude-file <file>', (file) => { verifier.excludeFile = file;})
 .parse(process.argv);
 
+verifier.init();
 verifier.verify(checkedUrl).then(result => {
   console.log(result);
 });

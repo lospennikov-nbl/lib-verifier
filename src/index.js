@@ -7,9 +7,11 @@
 const gitCloneOrPull = require('git-clone-or-pull');
 const path = require('path');
 const fs = require('fs');
+const url = require('url');
 
 const LicenseChecker = require('./Checkers/LicenseChecker');
 const AbstractChecker = require('./Checkers/AbstractChecker');
+const DEFAULT_EXCLUDE = '../excludes.json';
 
 /**
  * Main Verifier class
@@ -17,9 +19,19 @@ const AbstractChecker = require('./Checkers/AbstractChecker');
 class Verifier {
 
   constructor() {
-     this.checkers = [new LicenseChecker()];
-     this._local = false;
+    this._local = false;
+    this.excludeFile = DEFAULT_EXCLUDE;
   }
+
+  init() {
+    try {
+      this.exclude = require(this.excludeFile);
+    } catch (err) {
+      this.logger.error(err);
+    }
+    this.checkers = [new LicenseChecker(this.exclude)];
+  }
+
 
   verify(link) {
     return this._getRepo(link).then(path => {
@@ -28,7 +40,7 @@ class Verifier {
         const errors = checker.check(path);
         if (errors.length != 0) {
           errors.forEach((error) => {
-            this.logger.error(error);
+            this.logger.error(error.toString());
             verified = false;
           });
         }
@@ -40,11 +52,11 @@ class Verifier {
   _getRepo(link) {
     const name = this._getLocalPath(link);
     if (this.local && fs.existsSync(name)) {
-      return new Promise().resolve(name);
+      return Promise.resolve(name);
     }
     return new Promise((resolve, reject) => {
       gitCloneOrPull(link, path.join(process.cwd(), name), err => {
-
+        if (err) reject(err);
         resolve(name);
       });
     });
@@ -52,7 +64,9 @@ class Verifier {
 
   // temp
   _getLocalPath(link) {
-    return 'checked-repo';
+    const parsedUrl = url.parse(link);
+    return parsedUrl.pathname.substring(1).replace('.', '_').replace('/', '_');
+    // need more detailed replace or another way to generate path
   }
 
   /**
@@ -81,5 +95,14 @@ class Verifier {
   set local(value) {
     this._local = value;
   }
+
+  get exclude() {
+    return this._exclude;
+  }
+
+  set exclude(value) {
+    this._exclude = value;
+  }
+
 }
 module.exports = Verifier;
